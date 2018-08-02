@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 import org.json.JSONArray;
+import org.json.JSONObject;
 
 final class TermuxPreferences {
 
@@ -113,7 +114,7 @@ final class TermuxPreferences {
         return null;
     }
     
-    public String[][] mExtraKeys;
+    public String[][] mExtraKeys = new String[0][0];
 
     public void reloadFromProperties(Context context) {
         Properties props = findProps();
@@ -185,6 +186,22 @@ final class TermuxPreferences {
         }
     }
     
+    /** all(x instanceof JSONArray for x in list) */
+    void allJsonArray(JSONArray list) {
+        for(Object x : list)
+            if(!(x instanceof JSONArray))
+                return false;
+        return true;
+    }
+    
+    /** all(x not instanceof JSONArray for x in list) */
+    void allNotJsonArray(JSONArray list) {
+        for(Object x : list)
+            if(x instanceof JSONArray)
+                return false;
+        return true;
+    }
+    
     void setDefaultExtraKeys() {
         mExtraKeys = new String[][]{{"ESC", "CTRL", "ALT", "TAB", "-", "/", "|"}};
     }
@@ -192,20 +209,53 @@ final class TermuxPreferences {
     void parseExtraKeys(Properties props) throws Exception {
         String property = props.getProperty("extra-keys");
         
-        if(property == null) {
-            setDefaultExtraKeys();
-            return;
+        if(property == null)
+            return 
+        
+        boolean isArray = property.startsWith("[");
+        boolean isObject = property.startsWith("{");
+        boolean isString = !isArray && !isObject;
+        
+        JSONArray matrix = new JSONArray(); // dimension 0, no keys
+        if(isArray) {
+            JSONArray matrix = new JSONArray(property);
+            if(allJsonArray(matrix)) {
+                // we already have a matrix (dimension 2), do nothing
+                // or we have an empty array, do nothing.
+            } else if(allNotJsonArray(matrix)) {
+                // we have one line, we convert it to an array containing that array
+                // python matrix = [matrix]
+                matrix = new JSONArray().put(matrix);
+            } else {
+                throw Exception("extra-keys: Contains a list of mixed type, please use a list of strings or a list of list of strings");
+            }
+        } else if(isString) {
+            // remove " or ' at the beginning and end of the string
+            throw new Exception("extra-keys: Strings are not yet implemented");
+        } else if(isObject) {
+            throw new Exception("extra-keys: JSON Objects are not yet implemented");
         }
         
-        JSONArray arr = new JSONArray(property);
-        mExtraKeys = new String[arr.length()][];
-        for(int i = 0; i < arr.length(); i++) {
-            JSONArray line = arr.getJSONArray(i);
+        String[][] newMatrix = new String[matrix.length()][];
+        for(int i = 0; i < matrix.length(); i++) {
+            JSONArray line = matrix.getJSONArray(i);
             mExtraKeys[i] = new String[line.length()];
+            
             for(int j = 0; j < line.length(); j++) {
-                mExtraKeys[i][j] = line.getString(j);
+                Object elem = line.getObject(j);
+                
+                if(elem instanceof JSONObject)
+                    throw new Exception("extra-keys: Per key configuration are not yet implemented");
+                
+                String key = elem instanceof String ? elem :
+                             elem == JSONObject.NULL ? " " :
+                             elem.toString(); // some kind of integer, float or boolean.
+                
+                mExtraKeys[i][j] = key;
             }
         }
+        
+        mExtraKeys = newMatrix;
     }
     
     void setDefaultShortcuts() {
