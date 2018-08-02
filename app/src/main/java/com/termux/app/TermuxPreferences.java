@@ -117,51 +117,67 @@ final class TermuxPreferences {
 
     public void reloadFromProperties(Context context) {
         try {
-            File propsFile = new File(TermuxService.HOME_PATH + "/.termux/termux.properties");
-            if (!propsFile.exists())
-                propsFile = new File(TermuxService.HOME_PATH + "/.config/termux/termux.properties");
-
-            Properties props = new Properties();
-            if (propsFile.isFile() && propsFile.canRead()) {
-                String encoding = "utf-8"; // most useful default nowadays
-                try (FileInputStream in = new FileInputStream(propsFile)) {
-                    props.load(new InputStreamReader(in, encoding));
-                }
-            }
-
-            switch (props.getProperty("bell-character", "vibrate")) {
-                case "beep":
-                    mBellBehaviour = BELL_BEEP;
-                    break;
-                case "ignore":
-                    mBellBehaviour = BELL_IGNORE;
-                    break;
-                default: // "vibrate".
-                    mBellBehaviour = BELL_VIBRATE;
-                    break;
-            }
-            
-            JSONArray arr = new JSONArray(props.getProperty("extra-keys", "[[\"ESC\",\"CTRL\",\"ALT\",\"TAB\",\"-\",\"/\",\"|\"]]"));
-            mExtraKeys = new String[arr.length()][];
-            for(int i = 0; i < arr.length(); i++) {
-                JSONArray line = arr.getJSONArray(i);
-                mExtraKeys[i] = new String[line.length()];
-                for(int j = 0; j < line.length(); j++) {
-                    mExtraKeys[i][j] = line.getString(j);
-                }
-            }
-
-            mBackIsEscape = "escape".equals(props.getProperty("back-key", "back"));
-
-            shortcuts.clear();
-            parseAction("shortcut.create-session", SHORTCUT_ACTION_CREATE_SESSION, props);
-            parseAction("shortcut.next-session", SHORTCUT_ACTION_NEXT_SESSION, props);
-            parseAction("shortcut.previous-session", SHORTCUT_ACTION_PREVIOUS_SESSION, props);
-            parseAction("shortcut.rename-session", SHORTCUT_ACTION_RENAME_SESSION, props);
+            Properties props = findProps();
+            parseBellBehaviour(props);
+            parseExtraKeys(props);
+            parseBackKeys(props);
+            parseShortcuts(props);
         } catch (Exception e) {
             Toast.makeText(context, "Error loading properties: " + e.getMessage(), Toast.LENGTH_LONG).show();
             Log.e("termux", "Error loading props", e);
         }
+    }
+    
+    Properties findProps() throws Exception {
+        File propsFile = new File(TermuxService.HOME_PATH + "/.termux/termux.properties");
+        if (!propsFile.exists())
+            propsFile = new File(TermuxService.HOME_PATH + "/.config/termux/termux.properties");
+
+        Properties props = new Properties();
+        if (propsFile.isFile() && propsFile.canRead()) {
+            try (FileInputStream in = new FileInputStream(propsFile)) {
+                props.load(new InputStreamReader(in, "utf-8")); // "utf-8" is the most useful default nowadays
+            }
+        }
+        return props;
+    }
+    
+    void parseBellBehaviour() {
+        switch (props.getProperty("bell-character", "vibrate")) {
+            case "beep":
+                mBellBehaviour = BELL_BEEP;
+                break;
+            case "ignore":
+                mBellBehaviour = BELL_IGNORE;
+                break;
+            default: // "vibrate".
+                mBellBehaviour = BELL_VIBRATE;
+                break;
+        }
+    }
+    
+    void parseExtraKeys(Properties props) throws Exception {
+        JSONArray arr = new JSONArray(props.getProperty("extra-keys", "[[\"ESC\",\"CTRL\",\"ALT\",\"TAB\",\"-\",\"/\",\"|\"]]"));
+        mExtraKeys = new String[arr.length()][];
+        for(int i = 0; i < arr.length(); i++) {
+            JSONArray line = arr.getJSONArray(i);
+            mExtraKeys[i] = new String[line.length()];
+            for(int j = 0; j < line.length(); j++) {
+                mExtraKeys[i][j] = line.getString(j);
+            }
+        }
+    }
+    
+    void parseShortcuts(Properties props) throws Exception {
+        shortcuts.clear();
+        parseAction("shortcut.create-session", SHORTCUT_ACTION_CREATE_SESSION, props);
+        parseAction("shortcut.next-session", SHORTCUT_ACTION_NEXT_SESSION, props);
+        parseAction("shortcut.previous-session", SHORTCUT_ACTION_PREVIOUS_SESSION, props);
+        parseAction("shortcut.rename-session", SHORTCUT_ACTION_RENAME_SESSION, props);
+    }
+    
+    void parseBackKeys(Properties props) throws Exception {
+        mBackIsEscape = "escape".equals(props.getProperty("back-key", "back"));
     }
 
     public static final int SHORTCUT_ACTION_CREATE_SESSION = 1;
