@@ -116,19 +116,44 @@ final class TermuxPreferences {
     public String[][] mExtraKeys;
 
     public void reloadFromProperties(Context context) {
+        Properties props = findProps();
+        
+        setDefaultBellBehaviour();
+        setDefaultBackKeys();
+        setDefaultExtraKeys();
+        setDefaultShortcuts();
+        
         try {
-            Properties props = findProps();
             parseBellBehaviour(props);
+        } catch (Exception e) {
+            toastException(e);
+        }
+            
+        try {
             parseExtraKeys(props);
+        } catch (Exception e) {
+            toastException(e);
+        }
+        
+        try {
             parseBackKeys(props);
+        } catch (Exception e) {
+            toastException(e);
+        }
+        
+        try {
             parseShortcuts(props);
         } catch (Exception e) {
-            Toast.makeText(context, "Error loading properties: " + e.getMessage(), Toast.LENGTH_LONG).show();
-            Log.e("termux", "Error loading props", e);
+            toastException(e);
         }
     }
     
-    Properties findProps() throws Exception {
+    void toastException(Exception e) {
+        Toast.makeText(context, "Error loading properties: " + e.getMessage(), Toast.LENGTH_LONG).show();
+        Log.e("termux", "Error loading props", e);
+    }
+    
+    Properties findProps() {
         File propsFile = new File(TermuxService.HOME_PATH + "/.termux/termux.properties");
         if (!propsFile.exists())
             propsFile = new File(TermuxService.HOME_PATH + "/.config/termux/termux.properties");
@@ -140,6 +165,10 @@ final class TermuxPreferences {
             }
         }
         return props;
+    }
+    
+    void setDefaultBellBehaviour() {
+        mBellBehaviour = BELL_VIBRATE;
     }
     
     void parseBellBehaviour() {
@@ -156,8 +185,19 @@ final class TermuxPreferences {
         }
     }
     
+    void setDefaultExtraKeys() {
+        mExtraKeys = new String[][]{{"ESC", "CTRL", "ALT", "TAB", "-", "/", "|"}};
+    }
+    
     void parseExtraKeys(Properties props) throws Exception {
-        JSONArray arr = new JSONArray(props.getProperty("extra-keys", "[[\"ESC\",\"CTRL\",\"ALT\",\"TAB\",\"-\",\"/\",\"|\"]]"));
+        String property = props.getProperty("extra-keys");
+        
+        if(property == null) {
+            setDefaultExtraKeys();
+            return;
+        }
+        
+        JSONArray arr = new JSONArray(property);
         mExtraKeys = new String[arr.length()][];
         for(int i = 0; i < arr.length(); i++) {
             JSONArray line = arr.getJSONArray(i);
@@ -168,12 +208,20 @@ final class TermuxPreferences {
         }
     }
     
+    void setDefaultShortcuts() {
+        shortcuts.clear();
+    }
+    
     void parseShortcuts(Properties props) throws Exception {
         shortcuts.clear();
         parseAction("shortcut.create-session", SHORTCUT_ACTION_CREATE_SESSION, props);
         parseAction("shortcut.next-session", SHORTCUT_ACTION_NEXT_SESSION, props);
         parseAction("shortcut.previous-session", SHORTCUT_ACTION_PREVIOUS_SESSION, props);
         parseAction("shortcut.rename-session", SHORTCUT_ACTION_RENAME_SESSION, props);
+    }
+    
+    void setDefaultBackKeys(Properties props) throws Exception {
+        mBackIsEscape = false;
     }
     
     void parseBackKeys(Properties props) throws Exception {
