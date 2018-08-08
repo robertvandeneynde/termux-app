@@ -203,7 +203,7 @@ final class TermuxPreferences {
     }
     
     void setDefaultExtraKeys() {
-        mExtraKeys = new String[][]{{"ESC", "CTRL", "ALT", "TAB", "-", "/", "|"}};
+        mExtraKeys = new String[][]{{"ESC", "TAB", "CTRL", "ALT", "-", "DOWN", "UP"}};
     }
     
     void parseExtraKeys(Properties props) throws Exception {
