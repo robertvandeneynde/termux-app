@@ -211,6 +211,9 @@ public final class ExtraKeysView extends GridLayout {
      */
     @SuppressLint("ClickableViewAccessibility")
     void reload(ExtraKeysInfos infos) {
+        if(infos == null)
+            return;
+
         for(SpecialButtonState state : specialButtons.values())
             state.button = null;
 
@@ -290,7 +293,7 @@ public final class ExtraKeysView extends GridLayout {
                                         scheduledExecutor = null;
                                     }
                                     v.setBackgroundColor(BUTTON_COLOR);
-                                    String extraButtonDisplayedText = buttonInfo.getDisplayedText();
+                                    String extraButtonDisplayedText = buttonInfo.getPopup().getDisplayedText();
                                     popup(v, extraButtonDisplayedText);
                                 }
                                 if (popupWindow != null && event.getY() > 0) {

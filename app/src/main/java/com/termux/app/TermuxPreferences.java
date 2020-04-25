@@ -154,27 +154,6 @@ final class TermuxPreferences {
         return null;
     }
     
-    private static String[][][] parseExtraKeysFromString(String string) throws JSONException {
-        JSONArray arr = new JSONArray(string);
-        String[][][] matrix = new String[arr.length()][][];
-        for (int i = 0; i < arr.length(); i++) {
-            JSONArray line = arr.getJSONArray(i);
-            matrix[i] = new String[line.length()][];
-            for (int j = 0; j < line.length(); j++) {
-                JSONArray key = line.optJSONArray(j);
-                if (key != null && key.length() > 0) {
-                    matrix[i][j] = new String[key.length()];
-                    for (int k = 0; k < key.length(); k++) {
-                        matrix[i][j][k] = key.getString(k);
-                    }
-                } else {
-                    matrix[i][j] = new String[]{line.getString(j)};
-                }
-            }
-        }
-        return matrix;
-    }
-    
     void reloadFromProperties(Context context) {
         File propsFile = new File(TermuxService.HOME_PATH + "/.termux/termux.properties");
         if (!propsFile.exists())
@@ -206,38 +185,22 @@ final class TermuxPreferences {
 
         mUseDarkUI = props.getProperty("use-black-ui", "false");
         
-        final String[][][] defaultExtraKeys = {{{"ESC"}, {"TAB"}, {"CTRL"}, {"ALT"}, {"-", "|"}, {"DOWN"}, {"UP"}}};
-        
-        String[][][] extraKeysMatrix = defaultExtraKeys;
-        
-        String prop = props.getProperty("extra-keys");
-        if (prop != null) {
-            try {
-                extraKeysMatrix = parseExtraKeysFromString(prop);
-            } catch (JSONException e) {
-                Toast.makeText(context, "Could not load the extra-keys property from the config: " + e.toString(), Toast.LENGTH_LONG).show();
-                Log.e("termux", "Error loading props", e);
-                // the default will be used
-            }
-        }
+        String defaultExtraKeys = "[[ESC, TAB, CTRL, ALT, {key: '-', popup: '|'}, DOWN, UP]]";
 
-        Map<String, String> extraKeysMap = new HashMap<>();
         try {
+            String extrakeyProp = props.getProperty("extra-keys", defaultExtraKeys);
+
+            Map<String, String> extraKeysMap = new HashMap<>();
             JSONObject obj = new JSONObject(props.getProperty("extra-keys-map", "{}"));
             Iterator<String> keys = obj.keys();
             while (keys.hasNext()) {
                 String key = keys.next();
                 extraKeysMap.put(key, obj.getString(key));
             }
-        } catch (JSONException e) {
-            Toast.makeText(context, "Could not load the extra-keys-map property from the config: " + e.toString(), Toast.LENGTH_LONG).show();
-            Log.e("termux", "Error loading props", e);
-        }
 
-        String extraKeysStyle = props.getProperty("extra-keys-style", "default");
+            String extraKeysStyle = props.getProperty("extra-keys-style", "default");
 
-        try {
-            mExtraKeys = new ExtraKeysInfos(extraKeysMatrix, extraKeysMap, extraKeysStyle);
+            mExtraKeys = new ExtraKeysInfos(extrakeyProp, extraKeysMap, extraKeysStyle);
         } catch (Exception e) {
             Toast.makeText(context, "Could not load the extra-keys property from the config: " + e.toString(), Toast.LENGTH_LONG).show();
             Log.e("termux", "Error loading props", e);

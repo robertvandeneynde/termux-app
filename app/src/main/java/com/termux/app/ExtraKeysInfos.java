@@ -4,6 +4,7 @@ import androidx.annotation.Nullable;
 
 import org.json.JSONArray;
 import org.json.JSONException;
+import org.json.JSONObject;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -25,32 +26,60 @@ public class ExtraKeysInfos {
      */
     private Map<String, String> keyMap;
 
-    public ExtraKeysInfos(String[][][] propertiesInfo, Map<String, String> keyMap, String style) throws Exception {
+    public ExtraKeysInfos(String propertiesInfo, Map<String, String> keyMap, String style) throws Exception {
         this.style = style;
         this.keyMap = keyMap;
-        this.buttons = new ExtraKeyButton[propertiesInfo.length][];
-        for (int i = 0; i < propertiesInfo.length; i++) {
-            this.buttons[i] = new ExtraKeyButton[propertiesInfo[i].length];
-            for (int j = 0; j < propertiesInfo[i].length; j++) {
-                String[] keys = propertiesInfo[i][j];
+
+        // Convert String propertiesInfo to Array of Arrays
+        JSONArray arr = new JSONArray(propertiesInfo);
+        Object[][] matrix = new Object[arr.length()][];
+        for (int i = 0; i < arr.length(); i++) {
+            JSONArray line = arr.getJSONArray(i);
+            matrix[i] = new Object[line.length()];
+            for (int j = 0; j < line.length(); j++) {
+                matrix[i][j] = line.get(j);
+            }
+        }
+
+        // convert matrix to buttons
+        this.buttons = new ExtraKeyButton[matrix.length][];
+        for (int i = 0; i < matrix.length; i++) {
+            this.buttons[i] = new ExtraKeyButton[matrix[i].length];
+            for (int j = 0; j < matrix[i].length; j++) {
+                Object key = matrix[i][j];
+
+                JSONObject jobject = normalizeKeyConfig(key);
 
                 ExtraKeyButton button;
 
-                if(keys.length == 0) {
-                    throw new Exception("Cannot have empty array.");
-                } else if(keys.length == 1) {
+                if(! jobject.has("popup")) {
                     // no popup
-                    button = new ExtraKeyButton(this, keys[0]);
-                } else if(keys.length == 2){
-                    // a popup
-                    button = new ExtraKeyButton(this, keys[0], new ExtraKeyButton(this, keys[1]));
+                    button = new ExtraKeyButton(this, jobject);
                 } else {
-                    throw new Exception("Too much informations for key.");
+                    // a popup
+                    JSONObject popupJobject = normalizeKeyConfig(jobject.get("popup"));
+                    button = new ExtraKeyButton(this, jobject, new ExtraKeyButton(this, popupJobject));
                 }
 
                 this.buttons[i][j] = button;
             }
         }
+    }
+
+    /**
+     * "hello" -> {"key": "hello"}
+     */
+    private static JSONObject normalizeKeyConfig(Object key) throws JSONException {
+        JSONObject jobject;
+        if(key instanceof String) {
+            jobject = new JSONObject();
+            jobject.put("key", key);
+        } else if(key instanceof JSONObject) {
+            jobject = (JSONObject) key;
+        } else {
+            throw new JSONException("An key in the extra-key matrix must be a string or an object");
+        }
+        return jobject;
     }
 
     public ExtraKeyButton[][] getMatrix() {
@@ -237,7 +266,9 @@ public class ExtraKeysInfos {
 class ExtraKeyButton {
 
     /**
-     * The key, either a control character defined above (LEFT, RIGHT, PGUP...), either some text.
+     * The key that will be sent to the terminal,
+     * either a control character defined in ExtraKeysView.keyCodesForString (LEFT, RIGHT, PGUP...),
+     * either some text.
      */
     private String key;
 
@@ -248,32 +279,44 @@ class ExtraKeyButton {
     private ExtraKeyButton popup = null;
 
     /**
+     * The text that will be shown on the button,
+     * if provided by the config.
+     */
+    @Nullable
+    private String displayedTextFromConfig = null;
+
+    /**
      * The ExtraKeysInfos it belongs to
      */
-    ExtraKeysInfos parent;
+    private ExtraKeysInfos parent;
 
-    public ExtraKeyButton(ExtraKeysInfos parent, String key) {
-        this.key = key;
-        this.popup = null;
+    public ExtraKeyButton(ExtraKeysInfos parent, JSONObject config) throws JSONException {
+        String keyFromConfig = config.getString("key");
+        this.displayedTextFromConfig = config.optString("display", null);
+        this.key = ExtraKeysInfos.replaceAlias(keyFromConfig);
         this.parent = parent;
+        this.popup = null;
     }
 
-    public ExtraKeyButton(ExtraKeysInfos parent, String key, ExtraKeyButton popup) {
-        this.key = key;
+    public ExtraKeyButton(ExtraKeysInfos parent, JSONObject config, ExtraKeyButton popup) throws JSONException {
+        this(parent, config);
         this.popup = popup;
-        this.parent = parent;
     }
 
     public String getKey() {
         return key;
     }
 
+    @Nullable
     public ExtraKeyButton getPopup() {
         return popup;
     }
 
     public String getDisplayedText() {
-        return parent.getSelectedCharMap().get(getKey(), getKey());
+        if(this.displayedTextFromConfig != null)
+            return this.displayedTextFromConfig;
+        else
+            return parent.getSelectedCharMap().get(key, key);
     }
 
     public ExtraKeysInfos getParent() {
